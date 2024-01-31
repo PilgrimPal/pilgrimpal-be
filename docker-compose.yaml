@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  db:
+    container_name: pp-db
+    image: postgres:15
+    ports:
+      - 6543:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: moshaat
+      POSTGRES_DB: pilgrimpal
+
+  app:
+    container_name: pp-server
+    restart: always
+    build: .
+    volumes:
+      - .:/app
+      - ignore:/app/env/
+    env_file:
+      - .env
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+    command: sh -c "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+
+volumes:
+  ignore:
