@@ -21,9 +21,6 @@ from langchain_community.utilities import GoogleSearchAPIWrapper
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_core.tools import ToolException
 
-import models
-from translator import google_translator
-
 
 class ChatbotEngine:
     def __init__(
@@ -45,7 +42,6 @@ class ChatbotEngine:
         self._postgres_host = postgres_host
         self._postgres_port = postgres_port
         self._postgres_db = postgres_db
-        self._translator = google_translator()
 
         # init tools
         self._tools = self._init_tools()
@@ -59,7 +55,6 @@ class ChatbotEngine:
     def _init_tools(self) -> list[Tool]:
         tools = []
         tools.append(self._get_gsearch_tool())
-        # tools.append(self._get_translate_tool())
         tools.append(
             StructuredTool.from_function(
                 func=lambda x: ToolException("The python tool is not available."),
@@ -117,28 +112,6 @@ class ChatbotEngine:
         )
 
         return LlamaIndexTool.from_tool_config(gsearch_tool_config)
-
-    def _get_translate_tool(self) -> Tool:
-        # @tool("Translator", return_direct=True)
-        def translator(text: str, lang_tgt: str) -> str:
-            """Translate the text to another language."""
-            translated_text = self._translator.translate(
-                text=text, lang_tgt=lang_tgt, pronounce=True
-            )
-            result = f"Translated text: {translated_text[0]}"
-            if translated_text[2]:
-                result += f"\nPronunciation: {translated_text[2]}"
-            return result
-
-        # return translator
-
-        return StructuredTool.from_function(
-            func=translator,
-            name="Translator",
-            description="Useful when you want to translate the text to another language.",
-            args_schema=models.TranslatorInput,
-            return_direct=True,
-        )
 
     async def chat(self, session_id: str, prompt: str) -> str:
         # define the message history
