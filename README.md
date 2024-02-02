@@ -24,4 +24,4 @@ uvicorn main:app --reload
 docker compose up -d --build
 ```
 
-2. .env for redis's host can't be localhost so change it to `REDIS_HOST=redis`
+2. .env for db's host can't be localhost so change it to `POSTGRES_HOST=pp-db`
