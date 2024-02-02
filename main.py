@@ -53,5 +53,5 @@ def read_root():
 
 @app.post("/chat")
 async def post_chat(body: models.ChatbotReqBody) -> models.ChatbotRes:
-    response = chatbot_engine.chat(body.session_id, body.prompt)
+    response = await chatbot_engine.chat(body.session_id, body.prompt)
     return models.ChatbotRes(response=response)

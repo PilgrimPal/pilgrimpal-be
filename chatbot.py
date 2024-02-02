@@ -16,9 +16,13 @@ from langchain.memory import PostgresChatMessageHistory
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import OpenAI, ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.utilities import GoogleSearchAPIWrapper
 from langchain.tools import BaseTool, StructuredTool, tool
+from langchain_core.tools import ToolException
+
+import models
+from translator import google_translator
 
 
 class ChatbotEngine:
@@ -41,6 +45,7 @@ class ChatbotEngine:
         self._postgres_host = postgres_host
         self._postgres_port = postgres_port
         self._postgres_db = postgres_db
+        self._translator = google_translator()
 
         # init tools
         self._tools = self._init_tools()
@@ -54,26 +59,14 @@ class ChatbotEngine:
     def _init_tools(self) -> list[Tool]:
         tools = []
         tools.append(self._get_gsearch_tool())
-        def python(script):
-            """
-            Execute python code
-            """
-            try:
-                # exec(script)
-                return "Arbitrary python executable is not supported."
-            except Exception as e:
-                print(e)
-                # sentry_sdk.capture_exception(e)
-                return False
-
-
-        python_tool = StructuredTool.from_function(
-            func=python,
-            name="Python",
-            description="useful when you need to execute python script.",
-            # coroutine= ... <- you can specify an async method if desired as well
+        # tools.append(self._get_translate_tool())
+        tools.append(
+            StructuredTool.from_function(
+                func=lambda x: ToolException("The python tool is not available."),
+                name="Python",
+                description="A bad tool",
+            )
         )
-        tools.append(python_tool)
         return tools
 
     def _init_model(self) -> ChatOpenAI:
@@ -119,12 +112,35 @@ class ChatbotEngine:
         gsearch_tool_config = IndexToolConfig(
             query_engine=gsearch_agent,
             name=f"Search Engine",
-            description=f"Useful when you want answer for the questions on Google.",
+            # description=f"Useful when you want answer for the questions on Google.",
+            description=f"Useful for when you need to search the internet for information.",
         )
 
         return LlamaIndexTool.from_tool_config(gsearch_tool_config)
 
-    def chat(self, session_id: str, prompt: str) -> str:
+    def _get_translate_tool(self) -> Tool:
+        # @tool("Translator", return_direct=True)
+        def translator(text: str, lang_tgt: str) -> str:
+            """Translate the text to another language."""
+            translated_text = self._translator.translate(
+                text=text, lang_tgt=lang_tgt, pronounce=True
+            )
+            result = f"Translated text: {translated_text[0]}"
+            if translated_text[2]:
+                result += f"\nPronunciation: {translated_text[2]}"
+            return result
+
+        # return translator
+
+        return StructuredTool.from_function(
+            func=translator,
+            name="Translator",
+            description="Useful when you want to translate the text to another language.",
+            args_schema=models.TranslatorInput,
+            return_direct=True,
+        )
+
+    async def chat(self, session_id: str, prompt: str) -> str:
         # define the message history
         connection_string = f"postgresql://{self._postgres_user}:{self._postgres_password}@{self._postgres_host}:{self._postgres_port}/{self._postgres_db}"
         message_history = PostgresChatMessageHistory(
@@ -141,16 +157,14 @@ class ChatbotEngine:
         agent_chain = initialize_agent(
             self._tools,
             self._model,
-            memory=memory,
             agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
             verbose=True,
             handle_parsing_errors=True,
+            memory=memory,
         )
 
         # chat
-        input = self._prompt_temp.format_messages(
-            input=prompt,
-        )[0].content
-        response = agent_chain.run(input)
+        input = self._prompt_temp.format_messages(input=prompt)[0].content
+        response = await agent_chain.arun(input)
 
         return response
