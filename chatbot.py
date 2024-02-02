@@ -11,7 +11,10 @@ from llama_index.langchain_helpers.agents import (
 
 # LangChain imports
 from langchain.agents import initialize_agent, AgentType, Tool
-from langchain.chains.conversation.memory import ConversationBufferMemory
+from langchain.chains.conversation.memory import (
+    ConversationBufferMemory,
+    ConversationBufferWindowMemory,
+)
 from langchain.memory import PostgresChatMessageHistory
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import OpenAI, ChatOpenAI
@@ -122,8 +125,11 @@ class ChatbotEngine:
         )
 
         # define the memory
-        memory = ConversationBufferMemory(
-            memory_key="chat_history", chat_memory=message_history, return_messages=True
+        memory = ConversationBufferWindowMemory(
+            memory_key="chat_history",
+            chat_memory=message_history,
+            return_messages=True,
+            k=5,
         )
 
         # create the agent
@@ -141,3 +147,12 @@ class ChatbotEngine:
         response = await agent_chain.arun(input)
 
         return response
+
+    def generate_title(self, prompt) -> str:
+        return self._model(
+            [
+                HumanMessage(
+                    content=f"Give an email subject of the following prompt: \n{prompt}"
+                )
+            ]
+        ).content

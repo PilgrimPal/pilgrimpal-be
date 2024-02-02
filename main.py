@@ -4,10 +4,11 @@ import json
 import os
 
 # FastAPI imports
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-import models
+from databases import Database
+import schema
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,15 +21,19 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # import chatbot engine
 from chatbot import ChatbotEngine
 
-# instance for chatbot engine
+# define instances
 chatbot_engine = None
+db = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # before app startup
     # init chatbot engine
-    global chatbot_engine
+    global chatbot_engine, db
+    db_url = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
+    db = Database(db_url)
+    await db.connect()
     chatbot_engine = ChatbotEngine(
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         gsearch_key=os.getenv("GSEARCH_KEY"),
@@ -41,6 +46,7 @@ async def lifespan(app: FastAPI):
     )
     yield
     # after app shutdown
+    await db.disconnect()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -51,7 +57,52 @@ def read_root():
     return {"Hello": "World"}
 
 
-@app.post("/chat")
-async def post_chat(body: models.ChatbotReqBody) -> models.ChatbotRes:
+chatbot_router = APIRouter(tags=["chatbot"])
+
+
+@chatbot_router.post("/chat")
+async def post_chat(body: schema.ChatbotReqBody) -> schema.ChatbotRes:
     response = await chatbot_engine.chat(body.session_id, body.prompt)
-    return models.ChatbotRes(response=response)
+    title = await db.fetch_one(
+        "SELECT title FROM chat_title WHERE session_id = :session_id",
+        {"session_id": body.session_id},
+    )
+    if not title:
+        title = chatbot_engine.generate_title(body.prompt)
+        await db.execute(
+            "INSERT INTO chat_title (session_id, title) VALUES (:session_id, :title)",
+            {"session_id": body.session_id, "title": title},
+        )
+    return {
+        "title": title,
+        "response": response,
+    }
+
+
+@chatbot_router.get("/chat_history/{session_id}")
+async def get_chat_history(session_id: str) -> schema.ChatHistoryRes:
+    messages = await db.fetch_all(
+        "SELECT * FROM message_store WHERE session_id = :session_id",
+        {"session_id": session_id},
+    )
+    chat_title = await db.fetch_one(
+        "SELECT title FROM chat_title WHERE session_id = :session_id",
+        {"session_id": session_id},
+    )
+    return {
+        "title": chat_title.title,
+        "messages": messages,
+    }
+
+
+@chatbot_router.get("/chat_titles")
+async def get_chat_history() -> schema.ChatTitlesRes:
+    chat_titles = await db.fetch_all(
+        "SELECT * FROM chat_title ORDER BY created_at DESC"
+    )
+    return {
+        "titles": chat_titles,
+    }
+
+
+app.include_router(chatbot_router, prefix="/api/chatbot")
