@@ -64,7 +64,7 @@ chatbot_router = APIRouter(tags=["chatbot"])
 
 
 @chatbot_router.post("/chat")
-async def post_chat(body: schema.ChatbotReqBody) -> schema.ChatbotRes:
+async def execute_prompt(body: schema.ChatbotReqBody) -> schema.ChatbotRes:
     response = await chatbot_engine.chat(body.session_id, body.prompt)
     title = await db.fetch_one(
         "SELECT title FROM chat_title WHERE session_id = :session_id",
@@ -99,7 +99,7 @@ async def get_chat_history(session_id: str) -> schema.ChatHistoryRes:
 
 
 @chatbot_router.get("/chat_titles")
-async def get_chat_history() -> schema.ChatTitlesRes:
+async def get_chat_titles() -> schema.ChatTitlesRes:
     chat_titles = await db.fetch_all(
         "SELECT * FROM chat_title ORDER BY created_at DESC"
     )
@@ -114,7 +114,7 @@ crowd_router = APIRouter(tags=["crowd"])
 
 
 @crowd_router.get("/crowd")
-async def post_crowd():
+async def get_crowd():
     response = crowd_counter_engine.inference("./crowd_counter/vis/umroh.png")
     return response
 
