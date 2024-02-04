@@ -42,7 +42,6 @@ async def lifespan(app: FastAPI):
     global db, redis, psws_manager, chatbot_engine, crowd_counter_engine
 
     # init database
-    # db_url = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
     db = Database(settings.DATABASE_URL)
     await db.connect()
 
@@ -86,6 +85,7 @@ async def poll():
     i = 1
     while True:
         img_path = f"./images/area-1/img-{i}.jpg"
+        i = (i % 35) + 1
 
         response = crowd_counter_engine.inference(img_path)
         crowd_dict = {
@@ -93,10 +93,11 @@ async def poll():
             "crowd_density": response[1],
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        await psws_manager.broadcast_to_channel("area.1", json.dumps(crowd_dict))
+        await psws_manager.broadcast_to_channel("ps:area:1", json.dumps(crowd_dict))
+        redis.lpush("list:area:1", json.dumps(crowd_dict))
+        if redis.llen("list:area:1") > 60:  # 60 * 30s = 30 minutes
+            redis.ltrim("list:area:1", 0, 4)
 
-        if i == 35:
-            i = 1
         await asyncio.sleep(30)
 
 
@@ -161,15 +162,9 @@ app.include_router(chatbot_router, prefix="/api/chatbot")
 crowd_router = APIRouter(tags=["crowd"])
 
 
-@crowd_router.get("/crowd")
-async def get_crowd():
-    response = crowd_counter_engine.inference("./crowd_counter/vis/umroh.png")
-    return response
-
-
 @crowd_router.websocket("/{area_id}/ws")
 async def subscribe_bus_location(websocket: WebSocket, area_id: str) -> None:
-    channel = f"area.{area_id}"
+    channel = f"ps:area:{area_id}"
     await psws_manager.subscribe_to_channel(channel, websocket)
 
     try:
@@ -177,6 +172,46 @@ async def subscribe_bus_location(websocket: WebSocket, area_id: str) -> None:
             await websocket.receive_text()
     except WebSocketDisconnect:
         await psws_manager.disconnect_from_channel(channel, websocket)
+
+
+@crowd_router.get("/areas")
+async def get_crowd_areas():
+    area_ids = redis.keys("list:area:*")
+    response = {}
+    for area_id in area_ids:
+        area = area_id.split(":")[-1]
+        crowd_history = redis.lrange(area_id, 0, 1)
+        crowd_detail = json.loads(crowd_history[0]) if crowd_history else {}
+        response[area] = crowd_detail["crowd_density"]
+    return response
+
+
+@crowd_router.get("/{area_id}")
+async def get_crowd_detail(area_id: str) -> schema.CrowdDetailRes:
+    crowd_history = redis.lrange(f"list:area:{area_id}", 0, -1)
+    print(crowd_history)
+    if crowd_history:
+        crowd_history = [json.loads(crowd) for crowd in crowd_history]
+    else:
+        crowd_history = []
+    latest_crowd = crowd_history[-1] if crowd_history else {}
+
+    avg_count, avg_density, history_len = 0, 0, len(crowd_history)
+    if history_len > 0:
+        for crowd in crowd_history:
+            avg_count += crowd.get("crowd_count", 0)
+            avg_density += crowd.get("crowd_density", 0)
+        avg_count = avg_count / history_len
+        avg_density = avg_density / history_len
+
+    return {
+        "crowd_count": latest_crowd.get("crowd_count", None),
+        "crowd_density": latest_crowd.get("crowd_density", None),
+        "updated_at": latest_crowd.get("updated_at", None),
+        "avg_crowd_count": avg_count,
+        "avg_crowd_density": avg_density,
+        "crowd_history": crowd_history,
+    }
 
 
 app.include_router(crowd_router, prefix="/api/crowd")
