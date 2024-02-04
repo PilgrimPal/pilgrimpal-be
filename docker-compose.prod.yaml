@@ -1,5 +1,15 @@
 version: "3.8"
 services:
+  redis:
+    container_name: pp-redis
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass monshaat
+    volumes:
+      - redis:/data
+
   app:
     container_name: server
     restart: always
@@ -11,7 +21,10 @@ services:
       - .env
     ports:
       - 80:8000
+    depends_on:
+      - redis
     command: sh -c "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 
 volumes:
+  redis:
   ignore:
