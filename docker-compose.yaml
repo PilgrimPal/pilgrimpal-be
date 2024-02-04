@@ -7,8 +7,18 @@ services:
       - 6543:5432
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: moshaat
+      POSTGRES_PASSWORD: monshaat
       POSTGRES_DB: pilgrimpal
+
+  redis:
+    container_name: pp-redis
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass monshaat
+    volumes:
+      - redis:/data
 
   app:
     container_name: pp-server
@@ -23,7 +33,9 @@ services:
       - 8000:8000
     depends_on:
       - db
+      - redis
     command: sh -c "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 
 volumes:
+  redis:
   ignore:

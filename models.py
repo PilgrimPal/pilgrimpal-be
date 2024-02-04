@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from uuid import UUID
+from datetime import datetime
 
 
 class ChatTitle(BaseModel):

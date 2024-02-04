@@ -1,3 +1,5 @@
+from config.settings import get_settings
+
 # LlamaIndex imports
 from llama_index.agent import OpenAIAgent
 from llama_index.tools.tool_spec.load_and_search.base import LoadAndSearchToolSpec
@@ -24,28 +26,11 @@ from langchain_community.utilities import GoogleSearchAPIWrapper
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_core.tools import ToolException
 
+settings = get_settings()
+
 
 class ChatbotEngine:
-    def __init__(
-        self,
-        openai_api_key: str,
-        gsearch_key: str,
-        gsearch_engine_id: str,
-        postgres_user: str,
-        postgres_password: str,
-        postgres_host: str,
-        postgres_port: str,
-        postgres_db: str,
-    ) -> None:
-        self._openai_api_key = openai_api_key
-        self._gsearch_key = gsearch_key
-        self._gsearch_engine_id = gsearch_engine_id
-        self._postgres_user = postgres_user
-        self._postgres_password = postgres_password
-        self._postgres_host = postgres_host
-        self._postgres_port = postgres_port
-        self._postgres_db = postgres_db
-
+    def __init__(self) -> None:
         # init tools
         self._tools = self._init_tools()
 
@@ -69,7 +54,7 @@ class ChatbotEngine:
 
     def _init_model(self) -> ChatOpenAI:
         return ChatOpenAI(
-            openai_api_key=self._openai_api_key,
+            openai_api_key=settings.OPENAI_API_KEY,
             temperature=0,
             streaming=True,
             callbacks=[StreamingStdOutCallbackHandler()],
@@ -94,8 +79,8 @@ class ChatbotEngine:
 
     def _get_gsearch_tool(self) -> Tool:
         google_spec = GoogleSearchToolSpec(
-            key=self._gsearch_key,
-            engine=self._gsearch_engine_id,
+            key=settings.GSEARCH_KEY,
+            engine=settings.GSEARCH_ENGINE_ID,
         )
 
         # Wrap the google search tool as it returns large payloads
@@ -118,9 +103,8 @@ class ChatbotEngine:
 
     async def chat(self, session_id: str, prompt: str) -> str:
         # define the message history
-        connection_string = f"postgresql://{self._postgres_user}:{self._postgres_password}@{self._postgres_host}:{self._postgres_port}/{self._postgres_db}"
         message_history = PostgresChatMessageHistory(
-            connection_string=connection_string,
+            connection_string=settings.DATABASE_URL,
             session_id=session_id,
         )
 
