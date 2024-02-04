@@ -5,3 +5,6 @@ env*
 __pycache__
 .DS_Store
 
+crowd_counter/weights/*
+crowd_counter/vis/*
+crowd_counter/preds/*

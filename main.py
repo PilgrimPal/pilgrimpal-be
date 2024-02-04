@@ -18,11 +18,13 @@ import openai
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# import chatbot engine
+# import engine
 from chatbot import ChatbotEngine
+from crowd_counter import CrowdCounter
 
 # define instances
 chatbot_engine = None
+crowd_counter_engine = None
 db = None
 
 
@@ -30,7 +32,7 @@ db = None
 async def lifespan(app: FastAPI):
     # before app startup
     # init chatbot engine
-    global chatbot_engine, db
+    global chatbot_engine, crowd_counter_engine, db
     db_url = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
     db = Database(db_url)
     await db.connect()
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
         postgres_port=os.getenv("POSTGRES_PORT"),
         postgres_db=os.getenv("POSTGRES_DB"),
     )
+    crowd_counter_engine = CrowdCounter()
     yield
     # after app shutdown
     await db.disconnect()
@@ -106,3 +109,14 @@ async def get_chat_history() -> schema.ChatTitlesRes:
 
 
 app.include_router(chatbot_router, prefix="/api/chatbot")
+
+crowd_router = APIRouter(tags=["crowd"])
+
+
+@crowd_router.get("/crowd")
+async def post_crowd():
+    response = crowd_counter_engine.inference("./crowd_counter/vis/umroh.png")
+    return response
+
+
+app.include_router(crowd_router, prefix="/api/crowd")

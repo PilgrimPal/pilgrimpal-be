@@ -22,6 +22,7 @@ Deprecated==1.2.14
 dirtyjson==1.0.8
 distro==1.9.0
 dnspython==2.5.0
+easydict==1.11
 email-validator==2.1.0.post1
 fastai==2.7.13
 fastapi==0.109.0
@@ -65,11 +66,13 @@ networkx==3.2.1
 nltk==3.8.1
 numpy==1.26.3
 openai==1.10.0
+opencv-python==4.9.0.80
 orjson==3.9.12
 packaging==23.2
 pandas==2.2.0
 pillow==10.2.0
 preshed==3.0.9
+protobuf==4.25.2
 psutil==5.9.8
 psycopg==3.1.17
 psycopg-binary==3.1.17
@@ -100,6 +103,7 @@ srsly==2.4.8
 starlette==0.35.1
 sympy==1.12
 tenacity==8.2.3
+tensorboardX==2.6.2.2
 thinc==8.2.2
 threadpoolctl==3.2.0
 tiktoken==0.5.2
