@@ -162,18 +162,6 @@ app.include_router(chatbot_router, prefix="/api/chatbot")
 crowd_router = APIRouter(tags=["crowd"])
 
 
-@crowd_router.websocket("/{area_id}/ws")
-async def subscribe_bus_location(websocket: WebSocket, area_id: str) -> None:
-    channel = f"ps:area:{area_id}"
-    await psws_manager.subscribe_to_channel(channel, websocket)
-
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        await psws_manager.disconnect_from_channel(channel, websocket)
-
-
 @crowd_router.get("/areas")
 async def get_crowd_areas():
     area_ids = redis.keys("list:area:*")
@@ -215,3 +203,20 @@ async def get_crowd_detail(area_id: str) -> schema.CrowdDetailRes:
 
 
 app.include_router(crowd_router, prefix="/api/crowd")
+
+ws_router = APIRouter(tags=["websocket"])
+
+
+@ws_router.websocket("/{area_id}")
+async def subscribe_bus_location(websocket: WebSocket, area_id: str) -> None:
+    channel = f"ps:area:{area_id}"
+    await psws_manager.subscribe_to_channel(channel, websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await psws_manager.disconnect_from_channel(channel, websocket)
+
+
+app.include_router(ws_router, prefix="/ws/crowd")
