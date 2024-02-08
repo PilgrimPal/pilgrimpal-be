@@ -125,6 +125,8 @@ async def execute_prompt(body: schema.ChatbotReqBody) -> schema.ChatbotRes:
             "INSERT INTO chat_title (session_id, title) VALUES (:session_id, :title)",
             {"session_id": body.session_id, "title": title},
         )
+    else:
+        title = title.title
     return {
         "title": title,
         "response": response,
