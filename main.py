@@ -177,7 +177,6 @@ async def get_crowd_areas():
 @crowd_router.get("/{area_id}")
 async def get_crowd_detail(area_id: str) -> schema.CrowdDetailRes:
     crowd_history = redis.lrange(f"list:area:{area_id}", 0, -1)
-    print(crowd_history)
     if crowd_history:
         crowd_history = [json.loads(crowd) for crowd in crowd_history]
     else:
