@@ -134,7 +134,7 @@ async def execute_prompt(body: schema.ChatbotReqBody) -> schema.ChatbotRes:
 
 
 @chatbot_router.get("/chat_history/{session_id}")
-async def get_chat_history(session_id: str) -> schema.ChatHistoryRes:
+async def get_chat_history(session_id: str):
     messages = await db.fetch_all(
         "SELECT * FROM message_store WHERE session_id = :session_id",
         {"session_id": session_id},
@@ -143,9 +143,16 @@ async def get_chat_history(session_id: str) -> schema.ChatHistoryRes:
         "SELECT title FROM chat_title WHERE session_id = :session_id",
         {"session_id": session_id},
     )
+    result = []
+    for message in messages:
+        message_dict = json.loads(message["message"])["data"]
+        if message_dict["type"] == "human":
+            m = message_dict["content"].split("[<</LIM]\n\nUser Prompt: ")[1].replace(" [/INST]\n\n", "")
+            message_dict["content"] = m
+        result.append(message_dict)
     return {
         "title": chat_title.title,
-        "messages": messages,
+        "messages": result,
     }
 
 

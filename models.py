@@ -14,4 +14,4 @@ class ChatTitle(BaseModel):
 class MessageStore(BaseModel):
     id: int
     session_id: str
-    message: str
+    message: dict
